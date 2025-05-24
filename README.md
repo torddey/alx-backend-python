@@ -1,83 +1,92 @@
-#PROJECT INSTRUCTIONS
+# Project Instructions
 
+## 0. Getting Started with Python Generators
 
-0. Getting started with python generators
-Objective: create a generator that streams rows from an SQL database one by one.
+**Objective:**  
+Create a generator that streams rows from an SQL database one by one.
 
-Instructions:
+**Instructions:**
 
-Write a python script that seed.py:
+Write a Python script named `seed.py` that:
 
-Set up the MySQL database, ALX_prodev with the table user_data with the following fields:
-user_id(Primary Key, UUID, Indexed)
-name (VARCHAR, NOT NULL)
-email (VARCHAR, NOT NULL)
-age (DECIMAL,NOT NULL)
-Populate the database with the sample data from this user_data.csv
-Prototypes:
-def connect_db() :- connects to the mysql database server
-def create_database(connection):- creates the database ALX_prodev if it does not exist
-def connect_to_prodev() connects the the ALX_prodev database in MYSQL
-def create_table(connection):- creates a table user_data if it does not exists with the required fields
-def insert_data(connection, data):- inserts data in the database if it does not exist
+1. **Sets up the MySQL database** `ALX_prodev` with a table `user_data` containing:
+    - `user_id` (Primary Key, UUID, Indexed)
+    - `name` (VARCHAR, NOT NULL)
+    - `email` (VARCHAR, NOT NULL)
+    - `age` (DECIMAL, NOT NULL)
+2. **Populates the database** with sample data from `user_data.csv`.
 
+**Function Prototypes:**
+- `def connect_db()`: Connects to the MySQL database server.
+- `def create_database(connection)`: Creates the database `ALX_prodev` if it does not exist.
+- `def connect_to_prodev()`: Connects to the `ALX_prodev` database in MySQL.
+- `def create_table(connection)`: Creates the `user_data` table if it does not exist with the required fields.
+- `def insert_data(connection, data)`: Inserts data into the database if it does not exist.
 
+---
 
-1. Generator that streams rows from an SQL database
-Objective: create a generator that streams rows from an SQL database one by one.
+## 1. Generator that Streams Rows from an SQL Database
 
-Instructions:
+**Objective:**  
+Create a generator that streams rows from an SQL database one by one.
 
-In 0-stream_users.py write a function that uses a generator to fetch rows one by one from the user_data table. You must use the Yield python generator
+**Instructions:**
 
-Prototype: def stream_users()
-Your function should have no more than 1 loop
+- In `0-stream_users.py`, write a function that uses a generator to fetch rows one by one from the `user_data` table.
+- You must use the `yield` Python generator.
 
+**Prototype:**  
+`def stream_users()`
 
-2. Batch processing Large Data
-Objective: Create a generator to fetch and process data in batches from the users database
+- Your function should have no more than 1 loop.
 
-Instructions:
+---
 
-Write a function stream_users_in_batches(batch_size) that fetches rows in batches
+## 2. Batch Processing Large Data
 
-Write a function batch_processing() that processes each batch to filter users over the age of25`
+**Objective:**  
+Create a generator to fetch and process data in batches from the users database.
 
-You must use no more than 3 loops in your code. Your script must use the yield generator
+**Instructions:**
 
-Prototypes:
+- Write a function `stream_users_in_batches(batch_size)` that fetches rows in batches.
+- Write a function `batch_processing(batch_size)` that processes each batch to filter users over the age of 25.
+- You must use no more than 3 loops in your code.
+- Your script must use the `yield` generator.
 
-def stream_users_in_batches(batch_size)
-def batch_processing(batch_size)
+**Prototypes:**
+- `def stream_users_in_batches(batch_size)`
+- `def batch_processing(batch_size)`
 
+---
 
+## 3. Lazy Loading Paginated Data
 
-3. Lazy loading Paginated Data
-Objective: Simulte fetching paginated data from the users database using a generator to lazily load each page
+**Objective:**  
+Simulate fetching paginated data from the users database using a generator to lazily load each page.
 
-Instructions:
+**Instructions:**
 
-Implement a generator function lazypaginate(pagesize) that implements the paginate_users(page_size, offset) that will only fetch the next page when needed at an offset of 0.
+- Implement a generator function `lazy_paginate(page_size)` that uses `paginate_users(page_size, offset)` to fetch the next page only when needed, starting at offset 0.
+- You must only use one loop.
+- Include the `paginate_users` function in your code.
+- You must use the `yield` generator.
 
-You must only use one loop
-Include the paginate_users function in your code
-You must use the yield generator
-Prototype:
-def lazy_paginate(page_size)
+**Prototype:**  
+`def lazy_paginate(page_size)`
 
+---
 
+## 4. Memory-Efficient Aggregation with Generators
 
-4. Memory-Efficient Aggregation with Generators
-Objective: to use a generator to compute a memory-efficient aggregate function i.e average age for a large dataset
+**Objective:**  
+Use a generator to compute a memory-efficient aggregate function (e.g., average age) for a large dataset.
 
-Instruction:
+**Instructions:**
 
-Implement a generator stream_user_ages() that yields user ages one by one.
-
-Use the generator in a different function to calculate the average age without loading the entire dataset into memory
-
-Your script should print Average age of users: average age
-
-You must use no more than two loops in your script
-
-You are not allowed to use the SQL AVERAGE
+- Implement a generator `stream_user_ages()` that yields user ages one by one.
+- Use the generator in a different function to calculate the average age without loading the entire dataset into memory.
+- Your script should print:  
+  `Average age of users: <average age>`
+- You must use no more than two loops in your script.
+- **Do not use the SQL `AVERAGE` function.**

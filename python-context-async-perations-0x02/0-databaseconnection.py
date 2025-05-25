@@ -43,6 +43,6 @@ class DatabaseConnection:
 # Use the context manager to perform a query
 with DatabaseConnection() as conn:
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM users")
+    cursor.execute("SELECT * FROM user_data")
     results = cursor.fetchall()
     print("Query results:", results)

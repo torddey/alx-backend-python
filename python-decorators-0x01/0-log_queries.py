@@ -1,3 +1,4 @@
+from datetime import datetime
 import mysql.connector
 from mysql.connector import Error
 from dotenv import load_dotenv
@@ -7,21 +8,24 @@ import functools
 # Load environment variables from .env file
 load_dotenv()
 
-# Decorator to log SQL queries before execution.
 def log_queries():
+    """Decorator to log SQL queries with timestamps before execution."""
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            # The query is the first positional argument passed to the function
             query = args[0] if args else kwargs.get('query', 'Unknown query')
-            print(f"Executing query: {query}")            
+            # Get current timestamp and log the query
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{timestamp}] Executing query: {query}")
+            # Call the original function with its arguments
             return func(*args, **kwargs)
         return wrapper
     return decorator
 
-
-# Function to fetch all users from the user_data table with logging
-@log_queries()  
+@log_queries()  # Invoke the decorator factory with parentheses
 def fetch_all_users(query):
+    """Fetch users from the user_data table using the provided query."""
     try:
         connection = mysql.connector.connect(
             host=os.getenv("MYSQL_HOST"),

@@ -55,7 +55,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class UserBasicSerializer(serializers.ModelSerializer):
     """
-    Basic user serializer for nested relationships (without sensitive data).
+    Basic user serializer for nested relationships.
     """
     class Meta:
         model = User

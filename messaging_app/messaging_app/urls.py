@@ -1,30 +1,39 @@
 from django.contrib import admin
 from django.urls import path, include
+from rest_framework_simplejwt.views import (
+    TokenRefreshView,
+    TokenVerifyView,
+)
+from chats.auth import (
+    CustomTokenObtainPairView,
+    RegisterView,
+    LogoutView,
+    UserProfileView,
+    ChangePasswordView,
+    user_info,
+    check_username_availability,
+    check_email_availability,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    
+    # Authentication endpoints
+    path('api/auth/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/auth/verify/', TokenVerifyView.as_view(), name='token_verify'),
+    path('api/auth/register/', RegisterView.as_view(), name='register'),
+    path('api/auth/logout/', LogoutView.as_view(), name='logout'),
+    
+    # User profile endpoints
+    path('api/auth/profile/', UserProfileView.as_view(), name='user_profile'),
+    path('api/auth/change-password/', ChangePasswordView.as_view(), name='change_password'),
+    path('api/auth/user-info/', user_info, name='user_info'),
+    
+    # Utility endpoints
+    path('api/auth/check-username/', check_username_availability, name='check_username'),
+    path('api/auth/check-email/', check_email_availability, name='check_email'),
+    
+    # Chat endpoints
     path('api/', include('chats.urls')),
 ]
-
-# This configuration will create the following URL patterns:
-
-# Conversation endpoints:
-# GET    /api/conversations/                           - List all conversations for the user
-# POST   /api/conversations/                           - Create a new conversation
-# GET    /api/conversations/{id}/                      - Get specific conversation with messages
-# PUT    /api/conversations/{id}/                      - Update conversation
-# PATCH  /api/conversations/{id}/                      - Partially update conversation
-# DELETE /api/conversations/{id}/                      - Delete conversation
-# GET    /api/conversations/{id}/messages/             - Get paginated messages for conversation
-# POST   /api/conversations/{id}/add-participant/      - Add participant to conversation
-# POST   /api/conversations/{id}/remove-participant/   - Remove participant from conversation
-
-# Message endpoints:
-# GET    /api/messages/                                - List all messages for the user
-# POST   /api/messages/                                - Send a new message
-# GET    /api/messages/{id}/                           - Get specific message
-# PUT    /api/messages/{id}/                           - Update message (only by sender)
-# PATCH  /api/messages/{id}/                           - Partially update message (only by sender)
-# DELETE /api/messages/{id}/                           - Delete message (only by sender)
-# GET    /api/messages/conversation/{conversation_id}/ - Get messages by conversation
-# GET    /api/messages/search/?q=query                 - Search messages by content

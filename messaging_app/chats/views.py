@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -13,6 +12,12 @@ from .serializers import (
     MessageSerializer, 
     MessageBasicSerializer,
     UserBasicSerializer
+)
+from .permissions import (
+    IsConversationParticipant,
+    IsMessageSender,
+    CanModifyConversation,
+    IsParticipantOrReadOnly
 )
 
 
@@ -31,7 +36,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
     Provides CRUD operations and custom actions for conversations.
     """
     serializer_class = ConversationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsConversationParticipant]
     pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
@@ -197,7 +202,7 @@ class MessageViewSet(viewsets.ModelViewSet):
     Provides CRUD operations for messages within conversations.
     """
     serializer_class = MessageSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsMessageSender]
     pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):

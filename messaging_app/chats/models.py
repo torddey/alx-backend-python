@@ -36,7 +36,6 @@ class Message(models.Model):
     sender = models.ForeignKey('User', related_name='messages', on_delete=models.CASCADE)
     message_body = models.TextField()
     sent_at = models.DateTimeField(auto_now_add=True)
-    # Keeping the original fields for backward compatibility
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
 

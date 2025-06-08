@@ -81,20 +81,30 @@ class ConversationViewSet(viewsets.ModelViewSet):
         response_serializer = ConversationWithMessagesSerializer(conversation)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
     
-    def retrieve(self, request, *args, **kwargs):
+    def update(self, request, *args, **kwargs):
         """
-        Retrieve a specific conversation with messages.
+        Update a conversation (only by participants, enforced by IsParticipantOfConversation).
         """
         conversation = self.get_object()
-        serializer = self.get_serializer(conversation)
+        serializer = self.get_serializer(conversation, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return Response(serializer.data)
+    
+    def destroy(self, request, *args, **kwargs):
+        """
+        Delete a conversation (only by participants, enforced by IsParticipantOfConversation).
+        """
+        conversation = self.get_object()
+        conversation.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
     
     @action(detail=True, methods=['get'], url_path='messages')
     def messages(self, request, pk=None):
         """
         Get paginated messages for a specific conversation.
         """
-        conversation = self.get_object()
+        conversation = self.get_object()  # Enforces IsParticipantOfConversation
         messages = conversation.messages.select_related('sender').order_by('-sent_at')
         
         # Apply pagination
@@ -111,7 +121,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """
         Add a participant to an existing conversation.
         """
-        conversation = self.get_object()
+        conversation = self.get_object()  # Enforces IsParticipantOfConversation
         user_id = request.data.get('user_id')
         if not user_id:
             return Response(
@@ -121,6 +131,11 @@ class ConversationViewSet(viewsets.ModelViewSet):
         
         try:
             user_to_add = User.objects.get(user_id=user_id)
+            if conversation.participants.filter(user_id=user_to_add.user_id).exists():
+                return Response(
+                    {'error': 'User is already a participant.'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             conversation.participants.add(user_to_add)
             return Response(
                 {'message': f'User {user_to_add.username} added to conversation.'}, 
@@ -137,7 +152,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """
         Remove a participant from an existing conversation.
         """
-        conversation = self.get_object()
+        conversation = self.get_object()  # Enforces IsParticipantOfConversation
         user_id = request.data.get('user_id')
         if not user_id:
             return Response(
@@ -147,6 +162,16 @@ class ConversationViewSet(viewsets.ModelViewSet):
         
         try:
             user_to_remove = User.objects.get(user_id=user_id)
+            if not conversation.participants.filter(user_id=user_to_remove.user_id).exists():
+                return Response(
+                    {'error': 'User is not a participant.'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if user_to_remove == request.user:
+                return Response(
+                    {'error': 'Cannot remove yourself from the conversation.'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
             conversation.participants.remove(user_to_remove)
             return Response(
                 {'message': f'User {user_to_remove.username} removed from conversation.'}, 
@@ -192,23 +217,27 @@ class MessageViewSet(viewsets.ModelViewSet):
         """
         Retrieve a specific message.
         """
-        message = self.get_object()
+        message = self.get_object()  # Enforces IsParticipantOfConversation
         serializer = self.get_serializer(message)
         return Response(serializer.data)
     
     def update(self, request, *args, **kwargs):
         """
-        Update a message (only by the sender).
+        Update a message (only by the sender, enforced by IsMessageSender).
         """
-        message = self.get_object()
-        return super().update(request, *args, **kwargs)
+        message = self.get_object()  # Enforces IsParticipantOfConversation, IsMessageSender
+        serializer = self.get_serializer(message, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
     
     def destroy(self, request, *args, **kwargs):
         """
-        Delete a message (only by the sender).
+        Delete a message (only by the sender, enforced by IsMessageSender).
         """
-        message = self.get_object()
-        return super().destroy(request, *args, **kwargs)
+        message = self.get_object()  # Enforces IsParticipantOfConversation, IsMessageSender
+        message.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
     
     @action(detail=False, methods=['get'], url_path='conversation/(?P<conversation_id>[^/.]+)')
     def by_conversation(self, request, conversation_id=None):
@@ -217,6 +246,11 @@ class MessageViewSet(viewsets.ModelViewSet):
         """
         try:
             conversation = Conversation.objects.get(conversation_id=conversation_id)
+            if not conversation.participants.filter(user_id=request.user.user_id).exists():
+                return Response(
+                    {'error': 'You are not a participant in this conversation.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
             messages = conversation.messages.select_related('sender').order_by('sent_at')
             
             # Apply pagination
@@ -246,7 +280,8 @@ class MessageViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        messages = self.get_queryset().filter(
+        messages = self.get_queryset()  # Already filtered by participant
+        messages = messages.filter(
             Q(message_body__icontains=query) | Q(content__icontains=query)
         )
         

@@ -6,8 +6,6 @@ from .models import Conversation, Message
 class IsParticipantOfConversation(BasePermission):
     """
     Custom permission to only allow participants of a conversation to access it.
-    Ensures that only authenticated users who are participants in the conversation
-    can view, send, update, or delete messages.
     """
     def has_permission(self, request, view):
         """
@@ -27,10 +25,13 @@ class IsParticipantOfConversation(BasePermission):
         else:
             return False
         
-        # Use user_id to match custom User model's primary key
+        # Allow safe methods (GET, HEAD, OPTIONS) and modifying methods (PUT, PATCH, DELETE) for participants
+        if request.method in permissions.SAFE_METHODS or request.method in ['PUT', 'PATCH', 'DELETE']:
+            return conversation.participants.filter(user_id=request.user.user_id).exists()
+        
+        # Allow POST for participants (e.g., sending messages)
         return conversation.participants.filter(user_id=request.user.user_id).exists()
 
-# Other permission classes (unchanged, included for completeness)
 class IsOwnerOrReadOnly(BasePermission):
     def has_object_permission(self, request, view, obj):
         if request.method in permissions.SAFE_METHODS:
@@ -53,6 +54,9 @@ class IsParticipantOrReadOnly(BasePermission):
 
 class IsMessageSender(BasePermission):
     def has_object_permission(self, request, view, obj):
+        """
+        Allow participants to view messages, but only the sender can modify (PUT, PATCH, DELETE).
+        """
         if request.method in permissions.SAFE_METHODS:
             return obj.conversation.participants.filter(user_id=request.user.user_id).exists()
         if hasattr(obj, 'sender'):

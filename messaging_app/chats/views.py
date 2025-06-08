@@ -14,12 +14,10 @@ from .serializers import (
     UserBasicSerializer
 )
 from .permissions import (
-    IsConversationParticipant,
+    IsParticipantOfConversation,
     IsMessageSender,
-    CanModifyConversation,
-    IsParticipantOrReadOnly
+    CanModifyConversation
 )
-
 
 class StandardResultsSetPagination(PageNumberPagination):
     """
@@ -29,14 +27,13 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 100
 
-
 class ConversationViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing conversations.
     Provides CRUD operations and custom actions for conversations.
     """
     serializer_class = ConversationSerializer
-    permission_classes = [permissions.IsAuthenticated, IsConversationParticipant]
+    permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation]
     pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
@@ -89,14 +86,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         Retrieve a specific conversation with messages.
         """
         conversation = self.get_object()
-        
-        # Check if user is a participant
-        if not conversation.participants.filter(user_id=request.user.user_id).exists():
-            return Response(
-                {'error': 'You do not have permission to access this conversation.'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         serializer = self.get_serializer(conversation)
         return Response(serializer.data)
     
@@ -106,14 +95,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         Get paginated messages for a specific conversation.
         """
         conversation = self.get_object()
-        
-        # Check if user is a participant
-        if not conversation.participants.filter(user_id=request.user.user_id).exists():
-            return Response(
-                {'error': 'You do not have permission to access this conversation.'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         messages = conversation.messages.select_related('sender').order_by('-sent_at')
         
         # Apply pagination
@@ -131,14 +112,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         Add a participant to an existing conversation.
         """
         conversation = self.get_object()
-        
-        # Check if user is a participant
-        if not conversation.participants.filter(user_id=request.user.user_id).exists():
-            return Response(
-                {'error': 'You do not have permission to modify this conversation.'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         user_id = request.data.get('user_id')
         if not user_id:
             return Response(
@@ -149,7 +122,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         try:
             user_to_add = User.objects.get(user_id=user_id)
             conversation.participants.add(user_to_add)
-            
             return Response(
                 {'message': f'User {user_to_add.username} added to conversation.'}, 
                 status=status.HTTP_200_OK
@@ -166,14 +138,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         Remove a participant from an existing conversation.
         """
         conversation = self.get_object()
-        
-        # Check if user is a participant
-        if not conversation.participants.filter(user_id=request.user.user_id).exists():
-            return Response(
-                {'error': 'You do not have permission to modify this conversation.'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         user_id = request.data.get('user_id')
         if not user_id:
             return Response(
@@ -184,7 +148,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         try:
             user_to_remove = User.objects.get(user_id=user_id)
             conversation.participants.remove(user_to_remove)
-            
             return Response(
                 {'message': f'User {user_to_remove.username} removed from conversation.'}, 
                 status=status.HTTP_200_OK
@@ -195,14 +158,13 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-
 class MessageViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing messages.
     Provides CRUD operations for messages within conversations.
     """
     serializer_class = MessageSerializer
-    permission_classes = [permissions.IsAuthenticated, IsMessageSender]
+    permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation, IsMessageSender]
     pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
@@ -218,31 +180,11 @@ class MessageViewSet(viewsets.ModelViewSet):
         """
         Create a new message in a conversation.
         """
-        # Set the sender to the current user
         data = request.data.copy()
-        data['sender_id'] = request.user.user_id
-        
-        # Validate that the user is a participant in the conversation
-        conversation_id = data.get('conversation')
-        if conversation_id:
-            try:
-                conversation = Conversation.objects.get(conversation_id=conversation_id)
-                if not conversation.participants.filter(user_id=request.user.user_id).exists():
-                    return Response(
-                        {'error': 'You do not have permission to send messages to this conversation.'}, 
-                        status=status.HTTP_403_FORBIDDEN
-                    )
-            except Conversation.DoesNotExist:
-                return Response(
-                    {'error': 'Conversation not found.'}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-        
+        data['sender_id'] = str(request.user.user_id)  # Convert UUID to string
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         message = serializer.save()
-        
-        # Return the created message with full details
         response_serializer = MessageSerializer(message)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
     
@@ -251,14 +193,6 @@ class MessageViewSet(viewsets.ModelViewSet):
         Retrieve a specific message.
         """
         message = self.get_object()
-        
-        # Check if user is a participant in the conversation
-        if not message.conversation.participants.filter(user_id=request.user.user_id).exists():
-            return Response(
-                {'error': 'You do not have permission to access this message.'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         serializer = self.get_serializer(message)
         return Response(serializer.data)
     
@@ -267,14 +201,6 @@ class MessageViewSet(viewsets.ModelViewSet):
         Update a message (only by the sender).
         """
         message = self.get_object()
-        
-        # Check if the user is the sender of the message
-        if message.sender.user_id != request.user.user_id:
-            return Response(
-                {'error': 'You can only edit your own messages.'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         return super().update(request, *args, **kwargs)
     
     def destroy(self, request, *args, **kwargs):
@@ -282,14 +208,6 @@ class MessageViewSet(viewsets.ModelViewSet):
         Delete a message (only by the sender).
         """
         message = self.get_object()
-        
-        # Check if the user is the sender of the message
-        if message.sender.user_id != request.user.user_id:
-            return Response(
-                {'error': 'You can only delete your own messages.'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         return super().destroy(request, *args, **kwargs)
     
     @action(detail=False, methods=['get'], url_path='conversation/(?P<conversation_id>[^/.]+)')
@@ -299,14 +217,6 @@ class MessageViewSet(viewsets.ModelViewSet):
         """
         try:
             conversation = Conversation.objects.get(conversation_id=conversation_id)
-            
-            # Check if user is a participant
-            if not conversation.participants.filter(user_id=request.user.user_id).exists():
-                return Response(
-                    {'error': 'You do not have permission to access this conversation.'}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
             messages = conversation.messages.select_related('sender').order_by('sent_at')
             
             # Apply pagination

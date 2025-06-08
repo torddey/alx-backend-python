@@ -14,7 +14,7 @@ from .serializers import UserSerializer, UserBasicSerializer
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
-    Custom JWT token serializer that includes additional user information.
+    Custom JWT token serializer.
     """
     @classmethod
     def get_token(cls, user):

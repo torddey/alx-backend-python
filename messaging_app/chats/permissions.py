@@ -1,177 +1,176 @@
 from rest_framework import permissions
+from rest_framework.permissions import BasePermission
+from django.shortcuts import get_object_or_404
+from .models import Conversation, Message
 
-
-class IsOwnerOrReadOnly(permissions.BasePermission):
-    """
-    Custom permission to only allow owners of an object to edit it.
-    """
-    
-    def has_object_permission(self, request, view, obj):
-        # Read permissions are allowed for any request,
-        # so we'll always allow GET, HEAD or OPTIONS requests.
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        
-        # Write permissions are only allowed to the owner of the object.
-        return obj.user == request.user
-
-
-class IsParticipantOrReadOnly(permissions.BasePermission):
+class IsParticipantOfConversation(BasePermission):
     """
     Custom permission to only allow participants of a conversation to access it.
+    Ensures that only authenticated users who are participants in the conversation
+    can view, send, update, or delete messages.
     """
-    
-    def has_object_permission(self, request, view, obj):
-        # Check if user is a participant in the conversation
-        if hasattr(obj, 'participants'):
-            # For Conversation objects
-            return obj.participants.filter(user_id=request.user.user_id).exists()
-        elif hasattr(obj, 'conversation'):
-            # For Message objects
-            return obj.conversation.participants.filter(user_id=request.user.user_id).exists()
-        
-        return False
-
-
-class IsMessageSender(permissions.BasePermission):
-    """
-    Custom permission to only allow message senders to edit/delete their messages.
-    """
-    
-    def has_object_permission(self, request, view, obj):
-        # Read permissions for participants
-        if request.method in permissions.SAFE_METHODS:
-            return obj.conversation.participants.filter(user_id=request.user.user_id).exists()
-        
-        # Write permissions only for the message sender
-        return obj.sender.user_id == request.user.user_id
-
-
-class IsConversationParticipant(permissions.BasePermission):
-    """
-    Custom permission to only allow conversation participants to access conversation data.
-    """
-    
     def has_permission(self, request, view):
-        # Allow authenticated users to create conversations
+        """
+        Return True if the user is authenticated.
+        """
         return request.user and request.user.is_authenticated
     
     def has_object_permission(self, request, view, obj):
-        # Check if user is a participant in the conversation
-        return obj.participants.filter(user_id=request.user.user_id).exists()
-
-
-class CanModifyConversation(permissions.BasePermission):
-    """
-    Custom permission to allow conversation participants to modify conversation settings.
-    """
-    
-    def has_object_permission(self, request, view, obj):
-        # Only participants can modify conversation
-        if not obj.participants.filter(user_id=request.user.user_id).exists():
+        """
+        Object-level permission to only allow participants of a conversation
+        to access related objects (messages, conversation details).
+        """
+        if hasattr(obj, 'conversation'):
+            conversation = obj.conversation
+        elif hasattr(obj, 'participants'):
+            conversation = obj
+        else:
             return False
         
-        # For certain actions, you might want to restrict to conversation creators
-        # or admins. For now, all participants can modify.
-        return True
+        # Use user_id to match custom User model's primary key
+        return conversation.participants.filter(user_id=request.user.user_id).exists()
 
-
-class IsUserSelf(permissions.BasePermission):
-    """
-    Custom permission to only allow users to access their own profile.
-    """
-    
+# Other permission classes (unchanged, included for completeness)
+class IsOwnerOrReadOnly(BasePermission):
     def has_object_permission(self, request, view, obj):
-        # Check if the user is accessing their own profile
-        return obj.user_id == request.user.user_id
-
-
-class CanAccessUserData(permissions.BasePermission):
-    """
-    Custom permission for user data access with different levels.
-    """
-    
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated
-    
-    def has_object_permission(self, request, view, obj):
-        # Users can access their own data
-        if obj.user_id == request.user.user_id:
-            return True
-        
-        # Allow read-only access to basic user info for conversation participants
         if request.method in permissions.SAFE_METHODS:
-            # Check if users share any conversations
-            shared_conversations = request.user.conversations.filter(
-                participants=obj
-            ).exists()
-            return shared_conversations
-        
+            return True
+        if hasattr(obj, 'user'):
+            return obj.user == request.user
+        elif hasattr(obj, 'author'):
+            return obj.author == request.user
+        elif hasattr(obj, 'owner'):
+            return obj.owner == request.user
         return False
 
-
-class IsOwnerOrParticipant(permissions.BasePermission):
-    """
-    Combined permission for objects that can be accessed by owners or participants.
-    """
-    
+class IsParticipantOrReadOnly(BasePermission):
     def has_object_permission(self, request, view, obj):
-        # Check if user is the owner
-        if hasattr(obj, 'user') and obj.user.user_id == request.user.user_id:
-            return True
-        
-        # Check if user is a participant (for conversations)
         if hasattr(obj, 'participants'):
             return obj.participants.filter(user_id=request.user.user_id).exists()
-        
-        # Check if user is a participant through conversation (for messages)
-        if hasattr(obj, 'conversation'):
+        elif hasattr(obj, 'conversation'):
             return obj.conversation.participants.filter(user_id=request.user.user_id).exists()
-        
         return False
 
-
-class ReadOnlyForNonParticipants(permissions.BasePermission):
-    """
-    Allow read-only access for non-participants, full access for participants.
-    """
-    
+class IsMessageSender(BasePermission):
     def has_object_permission(self, request, view, obj):
-        # Check if user is a participant
+        if request.method in permissions.SAFE_METHODS:
+            return obj.conversation.participants.filter(user_id=request.user.user_id).exists()
+        if hasattr(obj, 'sender'):
+            return obj.sender == request.user
+        elif hasattr(obj, 'author'):
+            return obj.author == request.user
+        return False
+
+class IsConversationParticipant(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+    def has_object_permission(self, request, view, obj):
+        return obj.participants.filter(user_id=request.user.user_id).exists()
+
+class CanModifyConversation(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if not obj.participants.filter(user_id=request.user.user_id).exists():
+            return False
+        return True
+
+class IsUserSelf(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if hasattr(obj, 'user'):
+            return obj.user == request.user
+        elif hasattr(obj, 'user_id') and obj == request.user:
+            return True
+        return False
+
+class CanAccessUserData(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+    def has_object_permission(self, request, view, obj):
+        if obj == request.user:
+            return True
+        if request.method in permissions.SAFE_METHODS:
+            from django.db.models import Q
+            shared_conversations = Conversation.objects.filter(
+                Q(participants=request.user) & Q(participants=obj)
+            ).exists()
+            return shared_conversations
+        return False
+
+class IsOwnerOrParticipant(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if hasattr(obj, 'user') and obj.user == request.user:
+            return True
+        elif hasattr(obj, 'author') and obj.author == request.user:
+            return True
+        elif hasattr(obj, 'owner') and obj.owner == request.user:
+            return True
+        if hasattr(obj, 'participants'):
+            return obj.participants.filter(user_id=request.user.user_id).exists()
+        if hasattr(obj, 'conversation'):
+            return obj.conversation.participants.filter(user_id=request.user.user_id).exists()
+        return False
+
+class ReadOnlyForNonParticipants(BasePermission):
+    def has_object_permission(self, request, view, obj):
         is_participant = False
-        
         if hasattr(obj, 'participants'):
             is_participant = obj.participants.filter(user_id=request.user.user_id).exists()
         elif hasattr(obj, 'conversation'):
             is_participant = obj.conversation.participants.filter(user_id=request.user.user_id).exists()
-        
-        # Participants have full access
         if is_participant:
             return True
-        
-        # Non-participants have read-only access
         return request.method in permissions.SAFE_METHODS
 
-
-class DenyAll(permissions.BasePermission):
-    """
-    Permission class that denies all access.
-    """
-    
+class DenyAll(BasePermission):
     def has_permission(self, request, view):
         return False
-    
     def has_object_permission(self, request, view, obj):
         return False
 
-
-class AllowAny(permissions.BasePermission):
-    """
-    Permission class that allows any access.
-    """
-    
+class AllowAny(BasePermission):
     def has_permission(self, request, view):
         return True
-    
     def has_object_permission(self, request, view, obj):
+        return True
+
+class IsParticipantOfConversationForList(BasePermission):
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        conversation_id = view.kwargs.get('conversation_id') or view.kwargs.get('conversation_pk')
+        if not conversation_id:
+            conversation_id = request.query_params.get('conversation_id')
+        if conversation_id:
+            try:
+                conversation = get_object_or_404(Conversation, conversation_id=conversation_id)
+                return conversation.participants.filter(user_id=request.user.user_id).exists()
+            except (Conversation.DoesNotExist, ValueError):
+                return False
+        return True
+
+class IsMessageAuthor(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:
+            return obj.conversation.participants.filter(user_id=request.user.user_id).exists()
+        if hasattr(obj, 'author'):
+            return obj.author == request.user
+        elif hasattr(obj, 'sender'):
+            return obj.sender == request.user
+        elif hasattr(obj, 'user'):
+            return obj.user == request.user
+        return False
+
+class CanCreateMessage(BasePermission):
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        if request.method == 'POST':
+            conversation_id = request.data.get('conversation') or view.kwargs.get('conversation_id')
+            if conversation_id:
+                try:
+                    conversation = get_object_or_404(Conversation, conversation_id=conversation_id)
+                    return conversation.participants.filter(user_id=request.user.user_id).exists()
+                except (Conversation.DoesNotExist, ValueError):
+                    return False
         return True

@@ -1,4 +1,3 @@
-```python
 """
 Django settings for messaging_app project.
 
@@ -38,8 +37,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'chats',
     'rest_framework_simplejwt',
+    'django_filters',     
+    'chats',
 ]
 
 MIDDLEWARE = [
@@ -127,8 +127,7 @@ AUTH_USER_MODEL = 'chats.User'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',  
-        'rest_framework.authentication.BasicAuthentication',  
+        'rest_framework.authentication.SessionAuthentication',  # Optional: for browsable API
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -137,12 +136,15 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',  
+        'rest_framework.renderers.BrowsableAPIRenderer',  # Optional: for browsable API
     ],
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
         'rest_framework.parsers.FormParser',
         'rest_framework.parsers.MultiPartParser',
+    ],
+    'DEFAULT_FILTER_BACKENDS': [  # Added for django-filter
+        'django_filters.rest_framework.DjangoFilterBackend',
     ],
 }
 
@@ -184,4 +186,3 @@ SIMPLE_JWT = {
     'TOKEN_VERIFY_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenVerifySerializer',
     'TOKEN_BLACKLIST_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenBlacklistSerializer',
 }
-```

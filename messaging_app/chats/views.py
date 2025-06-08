@@ -1,7 +1,6 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, Prefetch
 from .models import User, Conversation, Message
@@ -18,14 +17,8 @@ from .permissions import (
     IsMessageSender,
     CanModifyConversation
 )
-
-class StandardResultsSetPagination(PageNumberPagination):
-    """
-    Custom pagination class for conversations and messages.
-    """
-    page_size = 20
-    page_size_query_param = 'page_size'
-    max_page_size = 100
+from .pagination import StandardResultsSetPagination
+from .filters import MessageFilter
 
 class ConversationViewSet(viewsets.ModelViewSet):
     """
@@ -102,18 +95,22 @@ class ConversationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='messages')
     def messages(self, request, pk=None):
         """
-        Get paginated messages for a specific conversation.
+        Get paginated and filtered messages for a specific conversation.
         """
         conversation = self.get_object()  # Enforces IsParticipantOfConversation
         messages = conversation.messages.select_related('sender').order_by('-sent_at')
         
+        # Apply filtering
+        message_filter = MessageFilter(request.GET, queryset=messages)
+        filtered_messages = message_filter.qs
+        
         # Apply pagination
-        page = self.paginate_queryset(messages)
+        page = self.paginate_queryset(filtered_messages)
         if page is not None:
             serializer = MessageBasicSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
         
-        serializer = MessageBasicSerializer(messages, many=True)
+        serializer = MessageBasicSerializer(filtered_messages, many=True)
         return Response(serializer.data)
     
     @action(detail=True, methods=['post'], url_path='add-participant')
@@ -191,6 +188,7 @@ class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation, IsMessageSender]
     pagination_class = StandardResultsSetPagination
+    filterset_class = MessageFilter  # Apply MessageFilter
     
     def get_queryset(self):
         """
@@ -242,7 +240,7 @@ class MessageViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='conversation/(?P<conversation_id>[^/.]+)')
     def by_conversation(self, request, conversation_id=None):
         """
-        Get all messages for a specific conversation.
+        Get paginated and filtered messages for a specific conversation.
         """
         try:
             conversation = Conversation.objects.get(conversation_id=conversation_id)
@@ -253,13 +251,17 @@ class MessageViewSet(viewsets.ModelViewSet):
                 )
             messages = conversation.messages.select_related('sender').order_by('sent_at')
             
+            # Apply filtering
+            message_filter = MessageFilter(request.GET, queryset=messages)
+            filtered_messages = message_filter.qs
+            
             # Apply pagination
-            page = self.paginate_queryset(messages)
+            page = self.paginate_queryset(filtered_messages)
             if page is not None:
                 serializer = MessageBasicSerializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
             
-            serializer = MessageBasicSerializer(messages, many=True)
+            serializer = MessageBasicSerializer(filtered_messages, many=True)
             return Response(serializer.data)
             
         except Conversation.DoesNotExist:
@@ -271,7 +273,7 @@ class MessageViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='search')
     def search(self, request):
         """
-        Search messages by content.
+        Search messages by content with pagination and filtering.
         """
         query = request.query_params.get('q', '')
         if not query:
@@ -285,11 +287,15 @@ class MessageViewSet(viewsets.ModelViewSet):
             Q(message_body__icontains=query) | Q(content__icontains=query)
         )
         
+        # Apply filtering
+        message_filter = MessageFilter(request.GET, queryset=messages)
+        filtered_messages = message_filter.qs
+        
         # Apply pagination
-        page = self.paginate_queryset(messages)
+        page = self.paginate_queryset(filtered_messages)
         if page is not None:
             serializer = MessageBasicSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
         
-        serializer = MessageBasicSerializer(messages, many=True)
+        serializer = MessageBasicSerializer(filtered_messages, many=True)
         return Response(serializer.data)

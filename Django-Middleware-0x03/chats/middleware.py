@@ -183,3 +183,127 @@ class OffensiveLanguageMiddleware:
         # Calculate when the oldest message will expire
         return max(0, int(self.time_window - (current_time - oldest_message)))
 
+
+class RolePermissionMiddleware:
+    """
+    Middleware to check user roles and restrict access to admin-only actions.
+    """
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+        # Define admin-only endpoints
+        self.admin_endpoints = [
+            '/api/admin/',
+            '/api/users/',
+            '/api/system/',
+            '/admin/',
+            '/api/analytics/',
+            '/api/reports/',
+            '/api/settings/',
+        ]
+        
+        # Define moderator endpoints (moderators and admins can access)
+        self.moderator_endpoints = [
+            '/api/moderate/',
+            '/api/reports/',
+            '/api/flags/',
+            '/api/content/',
+        ]
+    
+    def __call__(self, request):
+        # Get user information
+        user = getattr(request, 'user', None)
+        ip_address = self.get_client_ip(request)
+        
+        # Check if the request path requires role-based access
+        if self.requires_role_check(request.path):
+            # Check if user is authenticated
+            if not user or not user.is_authenticated:
+                # Log unauthorized access attempt
+                RequestLoggingMiddleware.log_error(
+                    "UnauthorizedAccess", 
+                    f"Unauthenticated user attempted to access {request.path}", 
+                    "Anonymous", 
+                    ip_address
+                )
+                
+                return JsonResponse({
+                    'error': 'Authentication required',
+                    'message': 'You must be logged in to access this resource.'
+                }, status=401)
+            
+            # Check admin access for admin endpoints
+            if self.is_admin_endpoint(request.path):
+                if not user.has_admin_access():
+                    # Log unauthorized admin access attempt
+                    RequestLoggingMiddleware.log_error(
+                        "InsufficientPermissions", 
+                        f"User {user.username} (role: {user.role}) attempted to access admin endpoint {request.path}", 
+                        user.username, 
+                        ip_address
+                    )
+                    
+                    return JsonResponse({
+                        'error': 'Insufficient permissions',
+                        'message': 'Admin access required for this action.',
+                        'required_role': 'admin',
+                        'user_role': user.role
+                    }, status=403)
+                
+                # Log successful admin access
+                RequestLoggingMiddleware.log_custom_event(
+                    "ADMIN_ACCESS", 
+                    f"Admin user {user.username} accessed {request.path}", 
+                    user.username
+                )
+            
+            # Check moderator access for moderator endpoints
+            elif self.is_moderator_endpoint(request.path):
+                if not user.has_moderator_access():
+                    # Log unauthorized moderator access attempt
+                    RequestLoggingMiddleware.log_error(
+                        "InsufficientPermissions", 
+                        f"User {user.username} (role: {user.role}) attempted to access moderator endpoint {request.path}", 
+                        user.username, 
+                        ip_address
+                    )
+                    
+                    return JsonResponse({
+                        'error': 'Insufficient permissions',
+                        'message': 'Moderator or admin access required for this action.',
+                        'required_role': 'moderator',
+                        'user_role': user.role
+                    }, status=403)
+                
+                # Log successful moderator access
+                RequestLoggingMiddleware.log_custom_event(
+                    "MODERATOR_ACCESS", 
+                    f"Moderator user {user.username} accessed {request.path}", 
+                    user.username
+                )
+        
+        response = self.get_response(request)
+        return response
+    
+    def get_client_ip(self, request):
+        """Get the client's IP address"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+    
+    def requires_role_check(self, path):
+        """Check if the path requires role-based access control"""
+        return (self.is_admin_endpoint(path) or 
+                self.is_moderator_endpoint(path))
+    
+    def is_admin_endpoint(self, path):
+        """Check if the path is an admin-only endpoint"""
+        return any(path.startswith(endpoint) for endpoint in self.admin_endpoints)
+    
+    def is_moderator_endpoint(self, path):
+        """Check if the path is a moderator endpoint"""
+        return any(path.startswith(endpoint) for endpoint in self.moderator_endpoints)
+

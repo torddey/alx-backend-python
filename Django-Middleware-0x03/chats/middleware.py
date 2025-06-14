@@ -184,7 +184,7 @@ class OffensiveLanguageMiddleware:
         return max(0, int(self.time_window - (current_time - oldest_message)))
 
 
-class RolePermissionMiddleware:
+class RolepermissionMiddleware:
     """
     Middleware to check user roles and restrict access to admin-only actions.
     """

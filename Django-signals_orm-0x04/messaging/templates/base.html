@@ -92,11 +92,45 @@
             border-bottom: 2px solid #007bff;
             padding-bottom: 10px;
         }
+        .navigation {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        .nav-links a {
+            text-decoration: none;
+            color: #007bff;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .nav-links a:hover {
+            background-color: #e3f2fd;
+        }
+        .nav-links a.danger {
+            color: #dc3545;
+        }
+        .nav-links a.danger:hover {
+            background-color: #f8d7da;
+        }
     </style>
 </head>
 <body>
     <header>
         <h1>Messaging System</h1>
+        <nav class="navigation">
+            <div class="nav-links">
+                <a href="{% url 'message_list' %}">📋 Messages</a>
+                <a href="{% url 'delete_user_confirm' %}" class="danger">🗑️ Delete Account</a>
+            </div>
+        </nav>
     </header>
     <main>
         {% block content %}{% endblock %}

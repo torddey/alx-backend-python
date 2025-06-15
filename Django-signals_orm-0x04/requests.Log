@@ -8,3 +8,6 @@ Forbidden: /
 [REQUEST END] 2025-06-14 23:25:34.903412 - User: Anonymous - Method: GET - Path: /favicon.ico - Status: 403 - Response Time: 0.000s
 Forbidden: /favicon.ico
 C:\Users\HP\Desktop\ALX\BackEnd ProDev\alx-backend-python\Django-signals_orm-0x04\messaging_app\settings.py changed, reloading.
+C:\Users\HP\Desktop\ALX\BackEnd ProDev\alx-backend-python\Django-signals_orm-0x04\messaging\signals.py changed, reloading.
+C:\Users\HP\Desktop\ALX\BackEnd ProDev\alx-backend-python\Django-signals_orm-0x04\messaging\views.py changed, reloading.
+C:\Users\HP\Desktop\ALX\BackEnd ProDev\alx-backend-python\Django-signals_orm-0x04\messaging\urls.py changed, reloading.

@@ -1,0 +1,209 @@
+{% extends 'base.html' %}
+{% block title %}Delete Account - Confirmation{% endblock %}
+
+{% block content %}
+<div class="delete-account-container">
+    <h2>⚠️ Delete Account</h2>
+    
+    <div class="warning-box">
+        <h3>⚠️ Warning: This action cannot be undone!</h3>
+        <p>Deleting your account will permanently remove:</p>
+        <ul>
+            <li>All your messages (sent and received)</li>
+            <li>All your notifications</li>
+            <li>All message edit history you've created</li>
+            <li>Your user profile and settings</li>
+        </ul>
+        <p><strong>This action is irreversible!</strong></p>
+    </div>
+    
+    <div class="confirmation-form">
+        <form method="post" action="{% url 'delete_user' %}" id="deleteForm">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="confirm_delete">Type "DELETE" to confirm:</label>
+                <input type="text" id="confirm_delete" name="confirm_delete" 
+                       placeholder="Type DELETE to confirm" required>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="cancelDelete()">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-danger" id="deleteBtn" disabled>
+                    Delete My Account
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="ajax-delete-section">
+        <h4>Or delete via AJAX:</h4>
+        <button type="button" class="btn btn-danger" onclick="deleteAccountAjax()">
+            Delete Account (AJAX)
+        </button>
+        <div id="ajaxResult"></div>
+    </div>
+</div>
+
+<script>
+document.getElementById('confirm_delete').addEventListener('input', function() {
+    const deleteBtn = document.getElementById('deleteBtn');
+    const confirmText = this.value.trim();
+    
+    if (confirmText === 'DELETE') {
+        deleteBtn.disabled = false;
+        deleteBtn.style.backgroundColor = '#dc3545';
+    } else {
+        deleteBtn.disabled = true;
+        deleteBtn.style.backgroundColor = '#6c757d';
+    }
+});
+
+function cancelDelete() {
+    if (confirm('Are you sure you want to cancel? Your account will not be deleted.')) {
+        window.location.href = '{% url "message_list" %}';
+    }
+}
+
+function deleteAccountAjax() {
+    if (!confirm('Are you absolutely sure you want to delete your account? This cannot be undone!')) {
+        return;
+    }
+    
+    const resultDiv = document.getElementById('ajaxResult');
+    resultDiv.innerHTML = '<p>Deleting account...</p>';
+    
+    fetch('{% url "delete_user_ajax" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `<p style="color: green;">${data.message}</p>`;
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
+        } else {
+            resultDiv.innerHTML = `<p style="color: red;">${data.message}</p>`;
+        }
+    })
+    .catch(error => {
+        resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+    });
+}
+</script>
+
+<style>
+.delete-account-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.warning-box {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.warning-box h3 {
+    color: #856404;
+    margin-top: 0;
+}
+
+.warning-box ul {
+    margin: 15px 0;
+    padding-left: 20px;
+}
+
+.warning-box li {
+    margin: 5px 0;
+    color: #856404;
+}
+
+.confirmation-form {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background-color: #c82333;
+}
+
+.btn-danger:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+}
+
+.ajax-delete-section {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: #e9ecef;
+    border-radius: 8px;
+}
+
+#ajaxResult {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 4px;
+}
+</style>
+{% endblock %} 

@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Messages</h2>
+<div class="messages-container">
+  {% for message in messages %}
+    <div class="message">
+      <div class="message-header">
+        <strong>{{ message.sender.username }}</strong> → <strong>{{ message.receiver.username }}</strong>
+        <span class="timestamp">Sent: {{ message.timestamp|date:"M d, Y H:i" }}</span>
+      </div>
+      
+      <div class="message-content">
+        {{ message.content }}
+      </div>
+      
+      {% if message.edited %}
+        <div class="edit-info">
+          ✏️ Edited{% if message.edited_at %} at {{ message.edited_at|date:"M d, Y H:i" }}{% endif %}{% if message.edited_by %} by {{ message.edited_by.username }}{% endif %}
+        </div>
+        
+        <details class="message-history">
+          <summary>📋 View Edit History ({{ message.history.count }} version{{ message.history.count|pluralize }})</summary>
+          <div class="history-list">
+            {% for history in message.history.all %}
+              <div class="history-item">
+                <div class="history-content">{{ history.old_content }}</div>
+                <div class="history-meta">
+                  <small>Edited at: {{ history.edited_at|date:"M d, Y H:i" }}{% if history.edited_by %} by {{ history.edited_by.username }}{% endif %}</small>
+                </div>
+              </div>
+            {% empty %}
+              <div class="history-item">No edit history available.</div>
+            {% endfor %}
+          </div>
+        </details>
+      {% endif %}
+    </div>
+  {% empty %}
+    <div class="message">
+      <p>No messages found.</p>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %} 

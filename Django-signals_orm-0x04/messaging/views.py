@@ -8,10 +8,14 @@ from django.db.models import Q
 from .models import Message, Notification, MessageHistory
 from django.db import models
 from chats.models import User
+from django.views.decorators.cache import cache_page
 
 def message_list(request):
     messages = Message.objects.select_related('sender', 'receiver', 'edited_by').prefetch_related('history').all()
     return render(request, 'messaging/message_list.html', {'messages': messages})
+
+# Decorate the message_list view with cache_page for 60 seconds
+message_list = cache_page(60)(message_list)
 
 @login_required
 def thread_list(request):

@@ -5,6 +5,25 @@
 <div class="threads-container">
     <h2>💬 Your Conversations</h2>
     
+    <!-- New Thread Form -->
+    <div class="new-thread-form">
+        <h3>Start New Conversation</h3>
+        <form onsubmit="createNewThread(event)">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="receiver_username">Send to (username):</label>
+                <input type="text" id="receiver_username" name="receiver_username" 
+                       placeholder="Enter username" required>
+            </div>
+            <div class="form-group">
+                <label for="content">Message:</label>
+                <textarea id="content" name="content" placeholder="Type your message..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Start Conversation</button>
+        </form>
+        <div id="newThreadResult"></div>
+    </div>
+    
     {% if threads %}
         <div class="threads-list">
             {% for thread in threads %}
@@ -49,16 +68,107 @@
         </div>
     {% else %}
         <div class="no-threads">
-            <p>No conversations yet. Start a new thread!</p>
+            <p>No conversations yet. Start a new thread above!</p>
         </div>
     {% endif %}
 </div>
+
+<script>
+function createNewThread(event) {
+    event.preventDefault();
+    const form = event.target;
+    const receiverUsername = form.querySelector('#receiver_username').value;
+    const content = form.querySelector('#content').value;
+    const resultDiv = document.getElementById('newThreadResult');
+    
+    // First, get the user ID for the receiver
+    fetch(`/messaging/get-user-id/${receiverUsername}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Now create the thread
+                return fetch('{% url "create_new_thread" %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `receiver_id=${data.user_id}&content=${encodeURIComponent(content)}`
+                });
+            } else {
+                throw new Error(data.message);
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                resultDiv.innerHTML = `<p style="color: green;">${data.message}</p>`;
+                form.reset();
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            } else {
+                resultDiv.innerHTML = `<p style="color: red;">${data.message}</p>`;
+            }
+        })
+        .catch(error => {
+            resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        });
+}
+</script>
 
 <style>
 .threads-container {
     max-width: 800px;
     margin: 0 auto;
     padding: 20px;
+}
+
+.new-thread-form {
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.new-thread-form h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #333;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.form-group textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+#newThreadResult {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 4px;
 }
 
 .threads-list {

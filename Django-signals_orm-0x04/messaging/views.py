@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_protect
 from django.db.models import Q
 from .models import Message, Notification, MessageHistory
 from django.db import models
+from chats.models import User
 
 def message_list(request):
     messages = Message.objects.select_related('sender', 'receiver', 'edited_by').prefetch_related('history').all()
@@ -90,9 +91,9 @@ def send_message(request):
     try:
         receiver = User.objects.get(user_id=receiver_id)
         
-        # Create the message
+        # Create the message with sender=request.user
         message_data = {
-            'sender': user,
+            'sender': user,  # This ensures sender=request.user
             'receiver': receiver,
             'content': content
         }
@@ -146,9 +147,9 @@ def reply_to_message(request):
         else:
             receiver = parent_message.sender
         
-        # Create reply
+        # Create reply with sender=request.user
         reply = Message.objects.create(
-            sender=user,
+            sender=user,  # This ensures sender=request.user
             receiver=receiver,
             content=content,
             parent_message=parent_message
@@ -171,6 +172,66 @@ def reply_to_message(request):
         return JsonResponse({
             'success': False,
             'message': f'Error sending reply: {str(e)}'
+        }, status=500)
+
+@login_required
+def get_user_id(request, username):
+    """Get user ID by username for new thread creation"""
+    try:
+        user = User.objects.get(username=username)
+        return JsonResponse({
+            'success': True,
+            'user_id': str(user.user_id),
+            'username': user.username
+        })
+    except User.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': f'User "{username}" not found'
+        }, status=404)
+
+@login_required
+@require_POST
+@csrf_protect
+def create_new_thread(request):
+    """Create a new thread (message without parent)"""
+    user = request.user
+    receiver_id = request.POST.get('receiver_id')
+    content = request.POST.get('content')
+    
+    if not content or not receiver_id:
+        return JsonResponse({
+            'success': False,
+            'message': 'Missing required fields'
+        }, status=400)
+    
+    try:
+        receiver = User.objects.get(user_id=receiver_id)
+        
+        # Create new thread with sender=request.user
+        new_thread = Message.objects.create(
+            sender=user,  # This ensures sender=request.user
+            receiver=receiver,
+            content=content,
+            parent_message=None  # This makes it a new thread
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'New thread created successfully',
+            'thread_id': str(new_thread.message_id),
+            'timestamp': new_thread.timestamp.isoformat()
+        })
+        
+    except User.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Receiver not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error creating thread: {str(e)}'
         }, status=500)
 
 @login_required

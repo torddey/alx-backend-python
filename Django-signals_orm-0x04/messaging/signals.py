@@ -1,4 +1,4 @@
-from django.db.models.signals import post_save, pre_save, post_delete
+from django.db.models.signals import post_save, pre_save, post_delete, pre_delete
 from django.dispatch import receiver
 from django.conf import settings
 from .models import Message, Notification, MessageHistory
@@ -50,33 +50,56 @@ def log_message_edit(sender, instance, **kwargs):
             )
             instance.edited = True
 
-@receiver(post_delete, sender=User)
-def cleanup_user_data(sender, instance, **kwargs):
+@receiver(pre_delete, sender=User)
+def cleanup_user_data_before_delete(sender, instance, **kwargs):
     """
-    Clean up all user-related data when a user is deleted
+    Clean up all user-related data before a user is deleted
     This signal ensures that all messages, notifications, and message histories
-    associated with the deleted user are properly removed
+    associated with the user are properly removed using delete() methods
     """
     user_id = instance.user_id
+    username = instance.username
     
     # Log the cleanup process
-    print(f"Cleaning up data for deleted user: {instance.username} (ID: {user_id})")
+    print(f"Starting cleanup for user: {username} (ID: {user_id})")
     
-    # Note: Most cleanup is handled automatically by CASCADE relationships
-    # This signal is mainly for logging and any additional cleanup logic
-    
-    # Count what was deleted (for logging purposes)
-    deleted_messages = Message.objects.filter(
+    # Count what will be deleted (for logging purposes)
+    messages_to_delete = Message.objects.filter(
         models.Q(sender=instance) | models.Q(receiver=instance)
-    ).count()
+    )
+    notifications_to_delete = Notification.objects.filter(user=instance)
+    history_to_clean = MessageHistory.objects.filter(edited_by=instance)
     
-    deleted_notifications = Notification.objects.filter(user=instance).count()
+    message_count = messages_to_delete.count()
+    notification_count = notifications_to_delete.count()
+    history_count = history_to_clean.count()
     
-    # MessageHistory entries with edited_by=instance will be set to NULL due to SET_NULL
-    # We can optionally delete them completely if desired
-    deleted_history = MessageHistory.objects.filter(edited_by=instance).count()
+    print(f"Found {message_count} messages, {notification_count} notifications, {history_count} history entries to clean up")
     
-    print(f"Cleanup completed for user {instance.username}:")
-    print(f"  - {deleted_messages} messages deleted")
-    print(f"  - {deleted_notifications} notifications deleted")
-    print(f"  - {deleted_history} message history entries affected") 
+    # Delete messages (this will cascade to related notifications and history)
+    if message_count > 0:
+        print(f"Deleting {message_count} messages...")
+        messages_to_delete.delete()
+    
+    # Delete any remaining notifications not caught by cascade
+    if notification_count > 0:
+        print(f"Deleting {notification_count} notifications...")
+        notifications_to_delete.delete()
+    
+    # Clean up message history entries where user was the editor
+    if history_count > 0:
+        print(f"Cleaning up {history_count} message history entries...")
+        # Option 1: Delete the history entries completely
+        history_to_clean.delete()
+        # Option 2: Set edited_by to NULL (uncomment if you prefer this approach)
+        # history_to_clean.update(edited_by=None)
+    
+    print(f"Cleanup completed for user {username}")
+
+@receiver(post_delete, sender=User)
+def log_user_deletion(sender, instance, **kwargs):
+    """
+    Log user deletion after it's completed
+    """
+    print(f"User {instance.username} has been successfully deleted")
+    print("All related data has been cleaned up") 

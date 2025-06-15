@@ -346,7 +346,7 @@ def unread_messages(request):
     """Display unread messages for the current user using custom manager"""
     user = request.user
     
-    # Use the custom manager to get unread messages
+    # Use the custom manager to get unread messages (includes .only() optimization)
     unread_messages = Message.unread.for_user(user)
     
     # Get unread count
@@ -356,6 +356,55 @@ def unread_messages(request):
         'unread_messages': unread_messages,
         'unread_count': unread_count,
         'user': user
+    })
+
+@login_required
+def unread_messages_optimized(request):
+    """Display unread messages with explicit .only() optimization"""
+    user = request.user
+    
+    # Explicitly use .only() to retrieve only necessary fields
+    unread_messages = Message.objects.filter(
+        receiver=user,
+        read=False
+    ).select_related('sender').only(
+        'message_id', 'sender__username', 'content', 'timestamp', 'read'
+    ).order_by('-timestamp')
+    
+    # Get unread count
+    unread_count = Message.objects.filter(
+        receiver=user,
+        read=False
+    ).count()
+    
+    return render(request, 'messaging/unread_messages.html', {
+        'unread_messages': unread_messages,
+        'unread_count': unread_count,
+        'user': user
+    })
+
+@login_required
+def unread_messages_summary(request):
+    """Get unread messages summary using custom manager"""
+    user = request.user
+    
+    # Use custom manager methods
+    unread_count = Message.unread.unread_count_for_user(user)
+    
+    # Get recent unread messages with .only() optimization
+    recent_unread = Message.unread.for_user(user)[:5]  # Only first 5
+    
+    return JsonResponse({
+        'unread_count': unread_count,
+        'recent_messages': [
+            {
+                'message_id': str(msg.message_id),
+                'sender': msg.sender.username,
+                'content': msg.content[:100] + '...' if len(msg.content) > 100 else msg.content,
+                'timestamp': msg.timestamp.isoformat()
+            }
+            for msg in recent_unread
+        ]
     })
 
 @login_required

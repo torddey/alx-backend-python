@@ -359,6 +359,23 @@ def unread_messages(request):
     })
 
 @login_required
+def unread_messages_with_unread_for_user(request):
+    """Display unread messages using Message.unread.unread_for_user method"""
+    user = request.user
+    
+    # Use the specific unread_for_user method with .only() optimization
+    unread_messages = Message.unread.unread_for_user(user)
+    
+    # Get unread count
+    unread_count = Message.unread.unread_count_for_user(user)
+    
+    return render(request, 'messaging/unread_messages.html', {
+        'unread_messages': unread_messages,
+        'unread_count': unread_count,
+        'user': user
+    })
+
+@login_required
 def unread_messages_optimized(request):
     """Display unread messages with explicit .only() optimization"""
     user = request.user

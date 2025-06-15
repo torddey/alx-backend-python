@@ -16,6 +16,18 @@ class UnreadMessagesManager(models.Manager):
             'message_id', 'sender__username', 'content', 'timestamp', 'read'
         ).order_by('-timestamp')
     
+    def unread_for_user(self, user):
+        """
+        Get unread messages for a specific user (alias for for_user)
+        Optimized to retrieve only necessary fields using .only()
+        """
+        return self.filter(
+            receiver=user,
+            read=False
+        ).select_related('sender').only(
+            'message_id', 'sender__username', 'content', 'timestamp', 'read'
+        ).order_by('-timestamp')
+    
     def unread_count_for_user(self, user):
         """
         Get count of unread messages for a user

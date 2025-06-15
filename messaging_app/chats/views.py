@@ -3,13 +3,14 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, Prefetch
-from .models import User, Conversation, Message
+from .models import User, Conversation, Message, MessageHistory
 from .serializers import (
     ConversationSerializer, 
     ConversationBasicSerializer,
     ConversationWithMessagesSerializer,
     MessageSerializer, 
     MessageBasicSerializer,
+    MessageHistorySerializer,
     UserBasicSerializer
 )
 from .permissions import (
@@ -40,7 +41,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
             'participants',
             Prefetch(
                 'messages',
-                queryset=Message.objects.select_related('sender').order_by('-sent_at')
+                queryset=Message.objects.select_related('sender').order_by('-timestamp')
             )
         ).distinct().order_by('-created_at')
     
@@ -98,7 +99,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         Get paginated and filtered messages for a specific conversation.
         """
         conversation = self.get_object()  # Enforces IsParticipantOfConversation
-        messages = conversation.messages.select_related('sender').order_by('-sent_at')
+        messages = conversation.messages.select_related('sender').order_by('-timestamp')
         
         # Apply filtering
         message_filter = MessageFilter(request.GET, queryset=messages)
@@ -197,7 +198,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         user = self.request.user
         return Message.objects.filter(
             conversation__participants=user
-        ).select_related('sender', 'conversation').order_by('-sent_at')
+        ).select_related('sender', 'conversation').prefetch_related('history__edited_by').order_by('-timestamp')
     
     def create(self, request, *args, **kwargs):
         """
@@ -237,6 +238,23 @@ class MessageViewSet(viewsets.ModelViewSet):
         message.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
+    @action(detail=True, methods=['get'], url_path='history')
+    def history(self, request, pk=None):
+        """
+        Get the edit history for a specific message.
+        """
+        message = self.get_object()  # Enforces IsParticipantOfConversation
+        history = message.history.select_related('edited_by').order_by('-edited_at')
+        
+        # Apply pagination
+        page = self.paginate_queryset(history)
+        if page is not None:
+            serializer = MessageHistorySerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = MessageHistorySerializer(history, many=True)
+        return Response(serializer.data)
+    
     @action(detail=False, methods=['get'], url_path='conversation/(?P<conversation_id>[^/.]+)')
     def by_conversation(self, request, conversation_id=None):
         """
@@ -249,7 +267,7 @@ class MessageViewSet(viewsets.ModelViewSet):
                     {'error': 'You are not a participant in this conversation.'},
                     status=status.HTTP_403_FORBIDDEN
                 )
-            messages = conversation.messages.select_related('sender').order_by('sent_at')
+            messages = conversation.messages.select_related('sender').order_by('timestamp')
             
             # Apply filtering
             message_filter = MessageFilter(request.GET, queryset=messages)
@@ -284,7 +302,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         
         messages = self.get_queryset()  # Already filtered by participant
         messages = messages.filter(
-            Q(message_body__icontains=query) | Q(content__icontains=query)
+            Q(content__icontains=query)
         )
         
         # Apply filtering

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import authenticate
-from .models import User, Conversation, Message
+from .models import User, Conversation, Message, MessageHistory
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -62,20 +62,35 @@ class UserBasicSerializer(serializers.ModelSerializer):
         fields = ['user_id', 'username', 'first_name', 'last_name', 'email']
 
 
+class MessageHistorySerializer(serializers.ModelSerializer):
+    """
+    Serializer for MessageHistory model.
+    """
+    edited_by = UserBasicSerializer(read_only=True)
+    
+    class Meta:
+        model = MessageHistory
+        fields = [
+            'history_id', 'old_content', 'edited_at', 'edited_by'
+        ]
+        read_only_fields = ['history_id', 'edited_at']
+
+
 class MessageSerializer(serializers.ModelSerializer):
     """
-    Serializer for Message model with sender details.
+    Serializer for Message model with sender details and edit history.
     """
     sender = UserBasicSerializer(read_only=True)
     sender_id = serializers.UUIDField(write_only=True)
+    history = MessageHistorySerializer(many=True, read_only=True)
     
     class Meta:
         model = Message
         fields = [
             'message_id', 'conversation', 'sender', 'sender_id',
-            'message_body', 'content', 'sent_at', 'timestamp'
+            'content', 'timestamp', 'edited', 'edited_at', 'history'
         ]
-        read_only_fields = ['message_id', 'sent_at', 'timestamp']
+        read_only_fields = ['message_id', 'timestamp', 'edited', 'edited_at']
 
     def create(self, validated_data):
         """
@@ -100,7 +115,7 @@ class MessageBasicSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = [
-            'message_id', 'sender', 'message_body', 'content', 'sent_at', 'timestamp'
+            'message_id', 'sender', 'content', 'timestamp', 'edited', 'edited_at'
         ]
 
 

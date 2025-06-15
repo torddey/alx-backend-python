@@ -3,6 +3,49 @@ from django.db import models
 from django.conf import settings
 from django.db.models import Q, Prefetch
 
+class UnreadMessagesManager(models.Manager):
+    """
+    Custom manager to filter unread messages for a specific user
+    """
+    def for_user(self, user):
+        """
+        Get unread messages for a specific user
+        Optimized to retrieve only necessary fields
+        """
+        return self.filter(
+            receiver=user,
+            read=False
+        ).select_related('sender').only(
+            'message_id', 'sender__username', 'content', 'timestamp', 'read'
+        ).order_by('-timestamp')
+    
+    def unread_count_for_user(self, user):
+        """
+        Get count of unread messages for a user
+        """
+        return self.filter(
+            receiver=user,
+            read=False
+        ).count()
+    
+    def mark_as_read_for_user(self, user, message_ids=None):
+        """
+        Mark messages as read for a user
+        If message_ids is provided, mark only those messages
+        Otherwise, mark all unread messages for the user
+        """
+        if message_ids:
+            return self.filter(
+                receiver=user,
+                message_id__in=message_ids,
+                read=False
+            ).update(read=True)
+        else:
+            return self.filter(
+                receiver=user,
+                read=False
+            ).update(read=True)
+
 class Message(models.Model):
     """
     Message model for direct messaging between users with threading support
@@ -13,6 +56,7 @@ class Message(models.Model):
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
+    read = models.BooleanField(default=False)  # New field for custom manager
     edited = models.BooleanField(default=False)
     edited_at = models.DateTimeField(null=True, blank=True)
     edited_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, related_name='edited_messages', on_delete=models.SET_NULL)
@@ -20,12 +64,17 @@ class Message(models.Model):
     # Threading support
     parent_message = models.ForeignKey('self', null=True, blank=True, related_name='replies', on_delete=models.CASCADE)
     
+    # Custom managers
+    objects = models.Manager()
+    unread = UnreadMessagesManager()
+    
     class Meta:
         ordering = ['timestamp']  # Changed to chronological order for threading
         indexes = [
             models.Index(fields=['sender', 'receiver']),
             models.Index(fields=['timestamp']),
             models.Index(fields=['is_read']),
+            models.Index(fields=['read']),  # New index for read field
             models.Index(fields=['parent_message']),  # New index for threading
         ]
     
@@ -33,6 +82,12 @@ class Message(models.Model):
         if self.parent_message:
             return f"Reply from {self.sender.username} to {self.receiver.username} at {self.timestamp}"
         return f"Message from {self.sender.username} to {self.receiver.username} at {self.timestamp}"
+    
+    def mark_as_read(self):
+        """Mark this message as read"""
+        self.read = True
+        self.is_read = True
+        self.save(update_fields=['read', 'is_read'])
     
     @property
     def is_reply(self):

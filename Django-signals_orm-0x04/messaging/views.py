@@ -339,4 +339,42 @@ def delete_user_ajax(request):
         return JsonResponse({
             'success': False,
             'message': f'Error deleting account: {str(e)}'
-        }, status=500) 
+        }, status=500)
+
+@login_required
+def unread_messages(request):
+    """Display unread messages for the current user using custom manager"""
+    user = request.user
+    
+    # Use the custom manager to get unread messages
+    unread_messages = Message.unread.for_user(user)
+    
+    # Get unread count
+    unread_count = Message.unread.unread_count_for_user(user)
+    
+    return render(request, 'messaging/unread_messages.html', {
+        'unread_messages': unread_messages,
+        'unread_count': unread_count,
+        'user': user
+    })
+
+@login_required
+@require_POST
+@csrf_protect
+def mark_messages_as_read(request):
+    """Mark messages as read via AJAX"""
+    user = request.user
+    message_ids = request.POST.getlist('message_ids[]')
+    
+    if message_ids:
+        # Mark specific messages as read
+        updated_count = Message.unread.mark_as_read_for_user(user, message_ids)
+    else:
+        # Mark all unread messages as read
+        updated_count = Message.unread.mark_as_read_for_user(user)
+    
+    return JsonResponse({
+        'success': True,
+        'message': f'Marked {updated_count} messages as read',
+        'updated_count': updated_count
+    }) 

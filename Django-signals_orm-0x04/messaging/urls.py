@@ -2,11 +2,13 @@ from django.urls import path
 from .views import (
     message_list, delete_user, delete_user_confirm, delete_user_ajax,
     thread_list, thread_detail, conversation_threads, send_message, reply_to_message,
-    create_new_thread, get_user_id
+    create_new_thread, get_user_id, unread_messages, mark_messages_as_read
 )
 
 urlpatterns = [
     path('messages/', message_list, name='message_list'),
+    path('unread/', unread_messages, name='unread_messages'),
+    path('mark-read/', mark_messages_as_read, name='mark_messages_as_read'),
     path('threads/', thread_list, name='thread_list'),
     path('threads/<uuid:thread_id>/', thread_detail, name='thread_detail'),
     path('conversation/<uuid:other_user_id>/', conversation_threads, name='conversation_threads'),

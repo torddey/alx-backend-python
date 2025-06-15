@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% block title %}Threads{% endblock %}
+
+{% block content %}
+<div class="threads-container">
+    <h2>💬 Your Conversations</h2>
+    
+    {% if threads %}
+        <div class="threads-list">
+            {% for thread in threads %}
+                <div class="thread-item">
+                    <div class="thread-header">
+                        <div class="conversation-partner">
+                            <strong>{{ thread.conversation_partner.username }}</strong>
+                            <span class="thread-timestamp">{{ thread.timestamp|date:"M d, Y H:i" }}</span>
+                        </div>
+                        <div class="thread-actions">
+                            <a href="{% url 'thread_detail' thread.message_id %}" class="btn btn-primary btn-sm">
+                                View Thread
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="thread-content">
+                        <p>{{ thread.content|truncatewords:30 }}</p>
+                    </div>
+                    
+                    <div class="thread-meta">
+                        <span class="reply-count">
+                            {% if thread.replies.count > 0 %}
+                                {{ thread.replies.count }} repl{{ thread.replies.count|pluralize:"y,ies" }}
+                            {% else %}
+                                No replies yet
+                            {% endif %}
+                        </span>
+                        
+                        {% if thread.edited %}
+                            <span class="edit-indicator">✏️ Edited</span>
+                        {% endif %}
+                        
+                        {% if thread.is_read %}
+                            <span class="read-indicator">✓ Read</span>
+                        {% else %}
+                            <span class="unread-indicator">● Unread</span>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="no-threads">
+            <p>No conversations yet. Start a new thread!</p>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.threads-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.threads-list {
+    margin-top: 20px;
+}
+
+.thread-item {
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: box-shadow 0.3s ease;
+}
+
+.thread-item:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.thread-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.conversation-partner {
+    display: flex;
+    flex-direction: column;
+}
+
+.conversation-partner strong {
+    font-size: 1.1em;
+    color: #333;
+}
+
+.thread-timestamp {
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 2px;
+}
+
+.thread-content {
+    margin: 15px 0;
+    line-height: 1.5;
+    color: #444;
+}
+
+.thread-meta {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.reply-count {
+    background-color: #e3f2fd;
+    padding: 4px 8px;
+    border-radius: 12px;
+    color: #1976d2;
+}
+
+.edit-indicator {
+    color: #ff9800;
+}
+
+.read-indicator {
+    color: #4caf50;
+}
+
+.unread-indicator {
+    color: #f44336;
+    font-weight: bold;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.no-threads {
+    text-align: center;
+    padding: 40px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    color: #666;
+}
+</style>
+{% endblock %} 

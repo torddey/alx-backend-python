@@ -9,9 +9,9 @@
         <h3>⚠️ Warning: This action cannot be undone!</h3>
         <p>Deleting your account will permanently remove:</p>
         <ul>
-            <li>All your messages (sent and received)</li>
-            <li>All your notifications</li>
-            <li>All message edit history you've created</li>
+            <li><strong>{{ message_count }}</strong> messages (sent and received)</li>
+            <li><strong>{{ notification_count }}</strong> notifications</li>
+            <li><strong>{{ history_count }}</strong> message edit history entries</li>
             <li>Your user profile and settings</li>
         </ul>
         <p><strong>This action is irreversible!</strong></p>
@@ -84,10 +84,17 @@ function deleteAccountAjax() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            resultDiv.innerHTML = `<p style="color: green;">${data.message}</p>`;
+            let resultMessage = data.message;
+            if (data.deleted_data) {
+                resultMessage += `<br><br>Deleted data:<br>`;
+                resultMessage += `- ${data.deleted_data.messages} messages<br>`;
+                resultMessage += `- ${data.deleted_data.notifications} notifications<br>`;
+                resultMessage += `- ${data.deleted_data.history_entries} history entries`;
+            }
+            resultDiv.innerHTML = `<p style="color: green;">${resultMessage}</p>`;
             setTimeout(() => {
                 window.location.href = '/';
-            }, 2000);
+            }, 3000);
         } else {
             resultDiv.innerHTML = `<p style="color: red;">${data.message}</p>`;
         }

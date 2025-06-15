@@ -1,10 +1,11 @@
 import uuid
 from django.db import models
 from django.conf import settings
+from django.db.models import Q, Prefetch
 
 class Message(models.Model):
     """
-    Message model for direct messaging between users
+    Message model for direct messaging between users with threading support
     """
     message_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sent_direct_messages', on_delete=models.CASCADE)
@@ -16,16 +17,94 @@ class Message(models.Model):
     edited_at = models.DateTimeField(null=True, blank=True)
     edited_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, related_name='edited_messages', on_delete=models.SET_NULL)
     
+    # Threading support
+    parent_message = models.ForeignKey('self', null=True, blank=True, related_name='replies', on_delete=models.CASCADE)
+    
     class Meta:
-        ordering = ['-timestamp']
+        ordering = ['timestamp']  # Changed to chronological order for threading
         indexes = [
             models.Index(fields=['sender', 'receiver']),
             models.Index(fields=['timestamp']),
             models.Index(fields=['is_read']),
+            models.Index(fields=['parent_message']),  # New index for threading
         ]
     
     def __str__(self):
+        if self.parent_message:
+            return f"Reply from {self.sender.username} to {self.receiver.username} at {self.timestamp}"
         return f"Message from {self.sender.username} to {self.receiver.username} at {self.timestamp}"
+    
+    @property
+    def is_reply(self):
+        """Check if this message is a reply to another message"""
+        return self.parent_message is not None
+    
+    @property
+    def is_thread_start(self):
+        """Check if this message starts a thread (has no parent)"""
+        return self.parent_message is None
+    
+    def get_thread_depth(self):
+        """Get the depth of this message in the thread"""
+        depth = 0
+        current = self
+        while current.parent_message:
+            depth += 1
+            current = current.parent_message
+        return depth
+    
+    def get_root_message(self):
+        """Get the root message of this thread"""
+        current = self
+        while current.parent_message:
+            current = current.parent_message
+        return current
+    
+    def get_all_replies(self, include_self=False):
+        """Get all replies in this thread using recursive query"""
+        if include_self:
+            return Message.objects.filter(
+                Q(message_id=self.message_id) | Q(parent_message=self.message_id)
+            ).select_related('sender', 'receiver', 'edited_by').prefetch_related('replies')
+        
+        return Message.objects.filter(parent_message=self.message_id).select_related(
+            'sender', 'receiver', 'edited_by'
+        ).prefetch_related('replies')
+    
+    def get_thread_messages(self):
+        """Get all messages in this thread (root + all replies)"""
+        root = self.get_root_message()
+        return Message.objects.filter(
+            Q(message_id=root.message_id) | Q(parent_message=root.message_id)
+        ).select_related('sender', 'receiver', 'edited_by').order_by('timestamp')
+    
+    @classmethod
+    def get_threaded_conversations(cls, user1, user2):
+        """Get all threaded conversations between two users"""
+        return cls.objects.filter(
+            Q(sender=user1, receiver=user2) | Q(sender=user2, receiver=user1)
+        ).filter(parent_message__isnull=True).select_related(
+            'sender', 'receiver', 'edited_by'
+        ).prefetch_related(
+            Prefetch(
+                'replies',
+                queryset=cls.objects.select_related('sender', 'receiver', 'edited_by').order_by('timestamp')
+            )
+        ).order_by('-timestamp')
+    
+    @classmethod
+    def get_user_threads(cls, user):
+        """Get all threads where the user is a participant"""
+        return cls.objects.filter(
+            Q(sender=user) | Q(receiver=user)
+        ).filter(parent_message__isnull=True).select_related(
+            'sender', 'receiver', 'edited_by'
+        ).prefetch_related(
+            Prefetch(
+                'replies',
+                queryset=cls.objects.select_related('sender', 'receiver', 'edited_by').order_by('timestamp')
+            )
+        ).order_by('-timestamp')
 
 class Notification(models.Model):
     """
